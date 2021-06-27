@@ -27,8 +27,6 @@
  * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 
-#define SPINE_SHORT_NAMES
-
 #include <spine/spine-sfml.h>
 
 #ifndef SPINE_MESH_VERTEX_COUNT_MAX
@@ -214,6 +212,7 @@ void SkeletonDrawable::draw(RenderTarget &target, RenderStates states) const {
 		if (states.blendMode != blend || states.texture != texture) {
 			target.draw(*vertexArray, states);
 			vertexArray->clear();
+			states.blendMode = blend;
 			states.texture = texture;
 		}
 
