@@ -214,7 +214,6 @@ void SkeletonDrawable::draw(RenderTarget &target, RenderStates states) const {
 		if (states.blendMode != blend || states.texture != texture) {
 			target.draw(*vertexArray, states);
 			vertexArray->clear();
-			states.blendMode = blend;
 			states.texture = texture;
 		}
 
