@@ -62,6 +62,24 @@ getBasename(const fs::path& filepath) {
             lower_basename = lower_basename.substr(0, char_suffix_pos);
     }
 
+    // replace abigous name
+    {
+        if (lower_basename.find("np0004") != std::string::npos)
+            return "hanako_swimsuit";
+
+        if (lower_basename.find("ch0060") != std::string::npos)
+            return "tsurugi_swimsuit";
+
+        if (lower_basename.find("ch0058") != std::string::npos)
+            return "hihumi_swimsuit";
+        
+        if (lower_basename.find("ch0069") != std::string::npos)
+            return "mika";
+
+        if (lower_basename.find("ch0070") != std::string::npos)
+            return "seia";
+    }
+
     return lower_basename;
 }
 
@@ -407,7 +425,7 @@ main(int argc, char* argv[]) {
 
         // skip L2D (aka files end with "home" or "scene")
         auto lower_skel_basename = toLowercase(skel_filepath.stem().string());
-        if (contains(lower_skel_basename, { "home", "scene" })) continue;
+        // if (contains(lower_skel_basename, { "home", "scene" })) continue;
 
         // get atlas filepath
         auto atlas_filepath = getAtlasPath(skel_filepath);
