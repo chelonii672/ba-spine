@@ -22,3 +22,8 @@ out/exporter <input directory> <output directory> <image format> <scale>
 ```sh
 sh build.sh
 ```
+
+
+## Library used
+[spine-runtimes](https://github.com/EsotericSoftware/spine-runtimes)
+[SFML](https://sfml-dev.org/)
