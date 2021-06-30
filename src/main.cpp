@@ -59,7 +59,7 @@ getBasename(const fs::path& filepath) {
     {
         size_t char_suffix_pos = lower_basename.find("_spr");
         if (char_suffix_pos != std::string::npos)
-            lower_basename = lower_basename.substr(0, lower_basename.length() - char_suffix_pos);
+            lower_basename = lower_basename.substr(0, char_suffix_pos);
     }
 
     return lower_basename;
@@ -81,7 +81,7 @@ getFilename(
     std::ios original_fmt(nullptr);
     original_fmt.copyfmt(result);
 
-    result << basename << '^' << animation_name;
+    result << basename << "--" << animation_name;
     if (index != -1) {
         result << '-' << std::setfill('0') << std::setw(prefix_width) << index;
         result.copyfmt(original_fmt);
