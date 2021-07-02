@@ -52,12 +52,12 @@ contains(const std::string& str, const std::vector<std::string>& values) {
 /// Get file's basename
 /// e.g. "character_spr.skel" -> "character_spr"
 std::string
-getBasename(const fs::path& filepath) {
+getBasename(const fs::path& filepath, const std::string& skin_name) {
     auto lower_basename = toLowercase(filepath.stem().string());
 
     // remove suffix "_spr"
     {
-        size_t char_suffix_pos = lower_basename.find("_spr");
+        size_t char_suffix_pos = lower_basename.rfind("_spr");
         if (char_suffix_pos != std::string::npos)
             lower_basename = lower_basename.substr(0, char_suffix_pos);
     }
@@ -65,19 +65,28 @@ getBasename(const fs::path& filepath) {
     // replace abigous name
     {
         if (lower_basename.find("np0004") != std::string::npos)
-            return "hanako_swimsuit";
+            lower_basename = "hanako_swimsuit";
 
         if (lower_basename.find("ch0060") != std::string::npos)
-            return "tsurugi_swimsuit";
+            lower_basename = "tsurugi_swimsuit";
 
         if (lower_basename.find("ch0058") != std::string::npos)
-            return "hihumi_swimsuit";
+            lower_basename = "hihumi_swimsuit";
         
         if (lower_basename.find("ch0069") != std::string::npos)
-            return "mika";
+            lower_basename = "mika";
 
         if (lower_basename.find("ch0070") != std::string::npos)
-            return "seia";
+            lower_basename = "seia";
+    }
+
+    if (skin_name != "default")
+        lower_basename += '-' + skin_name;
+    
+    {
+        auto bg_pos = lower_basename.rfind("_bg");
+        if (bg_pos != std::string::npos)
+            lower_basename = lower_basename.substr(0, bg_pos);
     }
 
     return lower_basename;
@@ -100,6 +109,7 @@ getFilename(
     original_fmt.copyfmt(result);
 
     result << basename << "--" << animation_name;
+
     if (index != -1) {
         result << '-' << std::setfill('0') << std::setw(prefix_width) << index;
         result.copyfmt(original_fmt);
@@ -162,114 +172,124 @@ drawCharacterSprite(
     // load skeleton
     auto skeleton = drawable.skeleton;
 
-    // get image x, y, width, height
-    skeleton->setPosition(0, 0);
-    skeleton->updateWorldTransform();
+    for (auto skin_i = 0; skin_i < skeleton_data->getSkins().size(); skin_i++) {
+        std::string skin_name = skeleton_data->getSkins()[skin_i]->getName().buffer();
 
-    float x, y, width, height;
-    {
-        spine::Vector<float> temp_val;
-        skeleton->getBounds(x, y, width, height, temp_val);
-    }
+        skeleton->setSkin(skin_name.c_str());
+        skeleton->setSlotsToSetupPose();
+        drawable.state->apply(*skeleton);
 
-    float distance_to_edge = 20.0f;
-    skeleton->setPosition(distance_to_edge/2 - x, distance_to_edge/2 - y);
-    skeleton->updateWorldTransform();
+        skin_name = toLowercase(skin_name);
 
-    // create renderer
-    sf::RenderTexture renderer;
-    if (!renderer.create(width + distance_to_edge, height + distance_to_edge)) {
-        std::cerr << "failed to create render(width: " << width + distance_to_edge
-                  << ", height: " << height + distance_to_edge << ")\n";
-        return;
-    }
+        // get image x, y, width, height
+        skeleton->setPosition(0, 0);
+        skeleton->updateWorldTransform();
 
-    // create character's directory
-    auto basename = getBasename(skel_filepath);
-    auto char_dest_dir = dest_dir / basename;
-    if (!fs::exists(char_dest_dir))
-        fs::create_directory(char_dest_dir);
-    
-    // notify to user
-    std::cout << "\n----- start drawing '" << basename << "' -----\n";
-
-    // draw animations to file
-    for (size_t i = 0; i < skeleton_data->getAnimations().size(); i++) {
-        auto animation = skeleton_data->getAnimations()[i];
-        auto track_entry = drawable.state->setAnimation(0, animation, false);
-
-        std::string animation_name = animation->getName().buffer();
-
-        // draw for static animation
-        if (isStaticAnimation(skeleton_data.get(), animation_name)) {
-            // notify to user
-            drawable.state->setAnimation(0, animation, false);
-            std::cout << "start drawing static animation '" << animation_name << "'\n";
-
-            // start drawing
-            drawable.update(0);
-
-            renderer.clear(sf::Color::Transparent);
-            renderer.draw(drawable, sf::BlendAlpha);
-            renderer.display();
-
-            // get filepath
-            auto file_destpath = char_dest_dir / getFilename(basename, animation_name, file_extension);
-            renderer.getTexture().copyToImage().saveToFile(file_destpath.string());
-
-            // notify to user
-            std::cout << "done drawing static animation '" << animation_name << "'\n\n";
+        float x, y, width, height;
+        {
+            spine::Vector<float> temp_val;
+            skeleton->getBounds(x, y, width, height, temp_val);
         }
 
-        // TODO: Learn using libav to dump animated L2D
-        // draw for animated animation
-        else {
-            std::cout << "drawing animated animation hasn't implemented yet\n\n";
+        float distance_to_edge = 20.0f;
+        skeleton->setPosition(distance_to_edge/2 - x, distance_to_edge/2 - y);
+        skeleton->updateWorldTransform();
 
-            // // create subdirectory contains animation's frames
-            // auto anim_dir_path = char_dest_dir / getFilename(basename, animation_name, file_extension);
-            // if (!fs::exists(anim_dir_path))
-            //     fs::create_directory(anim_dir_path);
+        // create renderer
+        sf::RenderTexture renderer;
+        if (!renderer.create(width + distance_to_edge, height + distance_to_edge)) {
+            std::cerr << "failed to create render(width: " << width + distance_to_edge
+                    << ", height: " << height + distance_to_edge << ")\n";
+            return;
+        }
 
-            // // change animation timescale
-            // track_entry->setTimeScale(0.2f);
-
-            // // calculate duration and delta time
-            // float animation_duration = track_entry->getAnimation()->getDuration();
-            // // 60 fps
-            // // e.g. if animation has duration is 3 second
-            // // -> 3*60 = 180 frames in total
-            // // -> increase 3/180 = 0.01(6)s each frame
-            // double delta_inc_duration = (double)(animation_duration / (animation_duration * 60));
-
-            // // notify to user
-            // std::cout << "start drawing animated animation (" << animation_duration << "s) '"
-            //           << animation_name << "'\n";
-
-            // // start drawing frames
-            // int16_t index = 0;
-            // double delta_time = index * delta_inc_duration;
-            // while (delta_time <= animation_duration) {
-            //     drawable.update(delta_time);
-
-            //     renderer.clear(sf::Color::Transparent);
-            //     renderer.draw(drawable, sf::BlendAlpha);
-            //     renderer.display();
-
-            //     // get filepath
-            //     auto file_destpath = anim_dir_path / getFilename(basename, animation_name, file_extension, index);
-            //     renderer.getTexture().copyToImage().saveToFile(file_destpath.string());
-
-            //     // notify to user
-            //     std::cout << "done drawing frame (" << delta_time << "s)\n";
-
-            //     // increase index
-            //     index++;
-            //     delta_time = index * delta_inc_duration;
-            // }
+        // create character's directory
+        auto basename = getBasename(skel_filepath, skin_name);
+        auto char_dest_dir = dest_dir / basename;
+        if (!fs::exists(char_dest_dir))
+            fs::create_directory(char_dest_dir);
         
-            // // notify to user
-            // std::cout << "done drawing animated animation '" << animation_name << "'\n\n";
+        // notify to user
+        std::cout << "\n----- start drawing '" << basename << "' -----\n";
+
+        // draw animations to file
+        for (auto animation_i = 0; animation_i < skeleton_data->getAnimations().size(); animation_i++) {
+            auto animation = skeleton_data->getAnimations()[animation_i];
+            auto track_entry = drawable.state->setAnimation(0, animation, false);
+
+            std::string animation_name = animation->getName().buffer();
+
+            // draw for static animation
+            if (isStaticAnimation(skeleton_data.get(), animation_name)) {
+                // notify to user
+                drawable.state->setAnimation(0, animation, false);
+                std::cout << "start drawing static animation '" << animation_name << "'\n";
+
+                // start drawing
+                drawable.update(0);
+
+                renderer.clear(sf::Color::Transparent);
+                renderer.draw(drawable, sf::BlendAlpha);
+                renderer.display();
+
+                // get filepath
+                auto file_destpath = char_dest_dir / getFilename(basename, animation_name, file_extension);
+                renderer.getTexture().copyToImage().saveToFile(file_destpath.string());
+
+                // notify to user
+                std::cout << "done drawing static animation '" << animation_name << "'\n\n";
+            }
+
+            // TODO: Learn using libav to dump animated L2D
+            // draw for animated animation
+            else {
+                std::cout << "drawing animated animation hasn't implemented yet\n\n";
+
+                // // create subdirectory contains animation's frames
+                // auto anim_dir_path = char_dest_dir / getFilename(basename, animation_name, file_extension);
+                // if (!fs::exists(anim_dir_path))
+                //     fs::create_directory(anim_dir_path);
+
+                // // change animation timescale
+                // track_entry->setTimeScale(0.2f);
+
+                // // calculate duration and delta time
+                // float animation_duration = track_entry->getAnimation()->getDuration();
+                // // 60 fps
+                // // e.g. if animation has duration is 3 second
+                // // -> 3*60 = 180 frames in total
+                // // -> increase 3/180 = 0.01(6)s each frame
+                // double delta_inc_duration = (double)(animation_duration / (animation_duration * 60));
+
+                // // notify to user
+                // std::cout << "start drawing animated animation (" << animation_duration << "s) '"
+                //           << animation_name << "'\n";
+
+                // // start drawing frames
+                // int16_t index = 0;
+                // double delta_time = index * delta_inc_duration;
+                // while (delta_time <= animation_duration) {
+                //     drawable.update(delta_time);
+
+                //     renderer.clear(sf::Color::Transparent);
+                //     renderer.draw(drawable, sf::BlendAlpha);
+                //     renderer.display();
+
+                //     // get filepath
+                //     auto file_destpath = anim_dir_path / getFilename(basename, animation_name, file_extension, index);
+                //     renderer.getTexture().copyToImage().saveToFile(file_destpath.string());
+
+                //     // notify to user
+                //     std::cout << "done drawing frame (" << delta_time << "s)\n";
+
+                //     // increase index
+                //     index++;
+                //     delta_time = index * delta_inc_duration;
+                // }
+            
+                // // notify to user
+                // std::cout << "done drawing animated animation '" << animation_name << "'\n\n";
+            }
         }
     }
 }
